@@ -7,234 +7,323 @@
 #include <QPen>
 #include <QPolygonF>
 #include <QLineF>
+#include <cmath>
+#include <QDebug>
 #include "globals.h"
 
 class ArrowItem : public QObject, public QGraphicsItem
 {
     Q_OBJECT
+
 public:
-    ArrowItem(QGraphicsItem *parent = nullptr) : QGraphicsItem(parent), startPoint(), endPoint() {}
+    explicit ArrowItem(QGraphicsItem *parent = nullptr);
+    
+    // QGraphicsItem interface
+    QRectF boundingRect() const override;
+    QPainterPath shape() const override;
+    void paint(QPainter *painter, const QStyleOptionGraphicsItem *option, QWidget *widget) override;
+    
+    // 鼠标事件
+    void mousePressEvent(QGraphicsSceneMouseEvent *event) override;
+    void mouseMoveEvent(QGraphicsSceneMouseEvent *event) override;
+    
+    // 公共接口
+    void setStartPoint(const QPointF &point);
+    void setEndPoint(const QPointF &point);
+    void setOldRectf(const QRectF &rect);
 
-    QRectF boundingRect() const override
-    {
-        // 假设 sceneRect 是场景的大小
-        return QRectF(0, 0, WIDTH, HEIGHT);
-    }
-
-    QPainterPath shape() const override
-    {
-        // 返回一个空的路径，使鼠标事件穿透
-        return QPainterPath();
-    }
-
-    void paint(QPainter *painter, const QStyleOptionGraphicsItem *option, QWidget *widget) override
-    {
-        Q_UNUSED(option)
-        Q_UNUSED(widget)
-
-        if (!isValid(startPoint) || !isValid(endPoint))
-        {
-            return; // 如果没有设置起点和终点，则不绘制
-        }
-
-        painter->setRenderHint(QPainter::Antialiasing); // 设置抗锯齿，使绘制更平滑
-        QPen pen(QColor(0, 0, 0, 0));
-        pen.setWidth(1);
-        painter->setPen(pen);
-        painter->setBrush(QBrush(Qt::green));
-        double startX = startPoint.x();
-        double startY = startPoint.y();
-        double endX = endPoint.x();
-        double endY = endPoint.y();
-        double fromX = startX;
-        double fromY = startY;
-        double toX = endX;
-        double toY = endY;
-        double theta = 30, theta2 = 15;
-        double headlen = sqrt(pow(toX - fromX, 2) + pow(toY - fromY, 2)) / 25.0,
-            headlen2 = headlen * cos(theta * M_PI / 180) / cos(theta2 * M_PI / 180);
-
-        double angle = atan2(toY - fromY, toX - fromX);
-        double angle1 = angle + (theta * M_PI / 180);
-        double angle2 = angle - (theta * M_PI / 180);
-        double angle3 = angle + (theta2 * M_PI / 180);
-        double angle4 = angle - (theta2 * M_PI / 180);
-
-        double topX = headlen * cos(angle1);
-        double topY = headlen * sin(angle1);
-        double botX = headlen * cos(angle2);
-        double botY = headlen * sin(angle2);
-
-        double topX2 = headlen2 * cos(angle3);
-        double topY2 = headlen2 * sin(angle3);
-        double botX2 = headlen2 * cos(angle4);
-        double botY2 = headlen2 * sin(angle4);
-
-        // 将坐标转换为相对于起点的位置
-        double arrowTopX = toX - topX;
-        double arrowTopY = toY - topY;
-        double arrowBotX = toX - botX;
-        double arrowBotY = toY - botY;
-
-        double arrowTopX2 = toX - topX2;
-        double arrowTopY2 = toY - topY2;
-        double arrowBotX2 = toX - botX2;
-        double arrowBotY2 = toY - botY2;
-        // 绘制线段和箭头主体
-        painter->drawPolygon(QPolygonF()
-                             << QPointF(fromX, fromY)
-                             << QPointF(arrowTopX2, arrowTopY2)
-                             << QPointF(arrowTopX, arrowTopY)
-                             << QPointF(toX, toY)
-                             << QPointF(arrowBotX, arrowBotY)
-                             << QPointF(arrowBotX2, arrowBotY2)
-                             << QPointF(fromX, fromY)
-                             );
-
-        //绘制遮罩区域
-        QPen pen1(QColor(0, 0, 0, 0));
-        pen1.setWidth(1);
-        painter->setPen(pen1);
-        painter->setBrush(QBrush(QColor(0, 0, 0, 150)));
-        QPointF intersectionPoint1 = getLineInterRectPoint(fromX, fromY, arrowTopX2, arrowTopY2, m_oldRectf);
-        QPointF intersectionPoint2 = getLineInterRectPoint(fromX, fromY, arrowBotX2, arrowBotY2, m_oldRectf);
-        QPolygonF markArrowArea = QPolygonF()
-                                  << QPointF(fromX, fromY)
-                                  << intersectionPoint1
-                                  << intersectionPoint2
-                                  << QPointF(fromX, fromY);
-        QPointF inPolyPoint;
-        if(!IsRectPointInPolygon(markArrowArea, m_oldRectf, &inPolyPoint))
-        {
-            painter->drawPolygon(markArrowArea);
-        }
-        else
-        {
-            painter->drawPolygon(QPolygonF()
-                                 << QPointF(fromX, fromY)
-                                 << intersectionPoint1
-                                 << inPolyPoint
-                                 << intersectionPoint2
-                                 << QPointF(fromX, fromY));
-        }
-        // 绘制目标点的十字标记
-        QPen pen2(Qt::yellow);
-        pen.setWidth(2);
-        painter->setPen(pen2);
-        painter->drawLine(QLineF(toX - 10, toY, toX + 10, toY));
-        painter->drawLine(QLineF(toX, toY - 10, toX, toY + 10));
-    }
-
-    void mousePressEvent(QGraphicsSceneMouseEvent *event) override
-    {
-        startPoint = event->pos();
-        endPoint = startPoint; // 初始时终点和起点相同
-        update(); // 更新绘制
-    }
-
-    void mouseMoveEvent(QGraphicsSceneMouseEvent *event) override
-    {
-        if (isValid(startPoint)) {
-            endPoint = event->pos();
-            update(); // 更新绘制
-        }
-    }
-
-    void setStartPoint(const QPointF &point)
-    {
-        startPoint = point;
-        update(); // 更新绘制
-    }
-
-    void setEndPoint(const QPointF &point)
-    {
-        endPoint = point;
-        update(); // 更新绘制
-    }
-    bool isValid(const QPointF &point)
-    {
-        return std::isfinite(point.x()) && std::isfinite(point.y());
-    }
-    QPointF getLineInterRectPoint(qreal x1, qreal y1, qreal x2, qreal y2, QRectF rect) {
-        QLineF line(x1, y1, x2, y2);
-        QPointF intersection;
-
-        // 检查与矩形左边的交点
-        if (lineSegmentsIntersect(line, QLineF(rect.left(), rect.top(), rect.left(), rect.bottom()),
-                                  &intersection))
-        {
-            return intersection;
-        }
-
-        // 检查与矩形右边的交点
-        if (lineSegmentsIntersect(line, QLineF(rect.right(), rect.top(), rect.right(), rect.bottom()),
-                                  &intersection))
-        {
-            return intersection;
-        }
-
-        // 检查与矩形顶部的交点
-        if (lineSegmentsIntersect(line, QLineF(rect.left(), rect.top(), rect.right(), rect.top()),
-                                  &intersection))
-        {
-            return intersection;
-        }
-
-        // 检查与矩形底部的交点
-        if (lineSegmentsIntersect(line, QLineF(rect.left(), rect.bottom(), rect.right(), rect.bottom()),
-                                  &intersection))
-        {
-            return intersection;
-        }
-
-        // 如果没有交点，返回无效的QPointF
-        qDebug()<<"无交点";
-        return QPointF();
-    }
-
-    bool lineSegmentsIntersect(const QLineF &line1, const QLineF &line2, QPointF *intersectionPoint)
-    {
-        QLineF::IntersectType type = line1.intersects(line2, intersectionPoint);
-        if (type != QLineF::BoundedIntersection)
-            return false;
-        return true;
-
-    }
-    bool IsRectPointInPolygon(const QPolygonF polygon, const QRectF m_oldRect, QPointF *intersectionPoint)
-    {
-        QPointF ltp = mapToScene(QPointF(m_oldRect.left(), m_oldRect.top()));
-        QPointF rtp = mapToScene(QPointF(m_oldRect.right(), m_oldRect.top()));
-        QPointF lbp = mapToScene(QPointF(m_oldRect.left(), m_oldRect.bottom()));
-        QPointF rbp = mapToScene(QPointF(m_oldRect.right(), m_oldRect.bottom()));
-        if(polygon.containsPoint(ltp, Qt::WindingFill))
-        {
-            *intersectionPoint = ltp;
-            return true;
-        }
-        if(polygon.containsPoint(rtp, Qt::WindingFill))
-        {
-            *intersectionPoint = rtp;
-            return true;
-        }
-        if(polygon.containsPoint(lbp, Qt::WindingFill))
-        {
-            *intersectionPoint = lbp;
-            return true;
-        }
-        if(polygon.containsPoint(rbp, Qt::WindingFill))
-        {
-            *intersectionPoint = rbp;
-            return true;
-        }
-        return false;
-    }
-    void setOldRectf(QRectF rect)
-    {
-        m_oldRectf = rect;
-    }
+signals:
+    void arrowChanged();
 
 private:
-    QPointF startPoint, endPoint;
+    // 常量定义
+    static constexpr double ARROW_ANGLE = 30.0;           // 箭头角度（度）
+    static constexpr double ARROW_INNER_ANGLE = 15.0;     // 箭头内角度（度）
+    static constexpr double CROSS_SIZE = 10.0;            // 十字标记大小
+    static constexpr double BOUNDING_MARGIN = 20.0;       // 边界框边距
+    static constexpr int PEN_WIDTH = 2;                   // 画笔宽度
+    
+    // 成员变量
+    QPointF m_startPoint;
+    QPointF m_endPoint;
     QRectF m_oldRectf;
+    
+    // 私有方法
+    bool isValidPoint(const QPointF &point) const;
+    QPolygonF createArrowPolygon() const;
+    QPolygonF createMaskPolygon() const;
+    void drawArrow(QPainter *painter) const;
+    void drawMask(QPainter *painter) const;
+    void drawTargetCross(QPainter *painter) const;
+    
+    // 几何计算方法
+    QPointF getLineRectIntersection(const QLineF &line, const QRectF &rect) const;
+    bool lineSegmentsIntersect(const QLineF &line1, const QLineF &line2, QPointF *intersectionPoint) const;
+    bool isRectPointInPolygon(const QPolygonF &polygon, const QRectF &rect, QPointF *intersectionPoint) const;
 };
+
+// 实现部分
+inline ArrowItem::ArrowItem(QGraphicsItem *parent) 
+    : QGraphicsItem(parent)
+    , m_startPoint()
+    , m_endPoint()
+    , m_oldRectf()
+{
+    setFlag(ItemIsMovable, false);
+    setFlag(ItemIsSelectable, false);
+}
+
+inline QRectF ArrowItem::boundingRect() const
+{
+    if (!isValidPoint(m_startPoint) || !isValidPoint(m_endPoint)) {
+        return QRectF();
+    }
+    
+    QRectF rect = QRectF(m_startPoint, m_endPoint).normalized();
+    return rect.adjusted(-BOUNDING_MARGIN, -BOUNDING_MARGIN, 
+                        BOUNDING_MARGIN, BOUNDING_MARGIN);
+}
+
+inline QPainterPath ArrowItem::shape() const
+{
+    QPainterPath path;
+    if (isValidPoint(m_startPoint) && isValidPoint(m_endPoint)) {
+        QPolygonF arrow = createArrowPolygon();
+        path.addPolygon(arrow);
+    }
+    return path;
+}
+
+inline void ArrowItem::paint(QPainter *painter, const QStyleOptionGraphicsItem *option, QWidget *widget)
+{
+    Q_UNUSED(option)
+    Q_UNUSED(widget)
+
+    if (!isValidPoint(m_startPoint) || !isValidPoint(m_endPoint)) {
+        return;
+    }
+
+    painter->setRenderHint(QPainter::Antialiasing);
+    
+    drawArrow(painter);
+    drawMask(painter);
+    drawTargetCross(painter);
+}
+
+inline void ArrowItem::mousePressEvent(QGraphicsSceneMouseEvent *event)
+{
+    if (event->button() == Qt::LeftButton) {
+        setStartPoint(event->pos());
+        setEndPoint(event->pos());
+    }
+    QGraphicsItem::mousePressEvent(event);
+}
+
+inline void ArrowItem::mouseMoveEvent(QGraphicsSceneMouseEvent *event)
+{
+    if (isValidPoint(m_startPoint)) {
+        setEndPoint(event->pos());
+    }
+    QGraphicsItem::mouseMoveEvent(event);
+}
+
+inline void ArrowItem::setStartPoint(const QPointF &point)
+{
+    if (!isValidPoint(point) || m_startPoint == point) {
+        return;
+    }
+    
+    prepareGeometryChange();
+    m_startPoint = point;
+    update();
+    emit arrowChanged();
+}
+
+inline void ArrowItem::setEndPoint(const QPointF &point)
+{
+    if (!isValidPoint(point) || m_endPoint == point) {
+        return;
+    }
+    
+    prepareGeometryChange();
+    m_endPoint = point;
+    update();
+    emit arrowChanged();
+}
+
+inline void ArrowItem::setOldRectf(const QRectF &rect)
+{
+    if (m_oldRectf == rect) {
+        return;
+    }
+    
+    m_oldRectf = rect;
+    update();
+}
+
+inline bool ArrowItem::isValidPoint(const QPointF &point) const
+{
+    return std::isfinite(point.x()) && std::isfinite(point.y());
+}
+
+inline QPolygonF ArrowItem::createArrowPolygon() const
+{
+    const double dx = m_endPoint.x() - m_startPoint.x();
+    const double dy = m_endPoint.y() - m_startPoint.y();
+    const double distance = std::sqrt(dx * dx + dy * dy);
+    
+    if (distance < 1.0) {
+        return QPolygonF();
+    }
+    
+    const double headLength = distance / 25.0;
+    const double headLength2 = headLength * std::cos(ARROW_ANGLE * M_PI / 180.0) / 
+                              std::cos(ARROW_INNER_ANGLE * M_PI / 180.0);
+    
+    const double angle = std::atan2(dy, dx);
+    const double angle1 = angle + (ARROW_ANGLE * M_PI / 180.0);
+    const double angle2 = angle - (ARROW_ANGLE * M_PI / 180.0);
+    const double angle3 = angle + (ARROW_INNER_ANGLE * M_PI / 180.0);
+    const double angle4 = angle - (ARROW_INNER_ANGLE * M_PI / 180.0);
+    
+    const QPointF arrowTop = m_endPoint - QPointF(headLength * std::cos(angle1), 
+                                                  headLength * std::sin(angle1));
+    const QPointF arrowBot = m_endPoint - QPointF(headLength * std::cos(angle2), 
+                                                  headLength * std::sin(angle2));
+    const QPointF arrowTop2 = m_endPoint - QPointF(headLength2 * std::cos(angle3), 
+                                                   headLength2 * std::sin(angle3));
+    const QPointF arrowBot2 = m_endPoint - QPointF(headLength2 * std::cos(angle4), 
+                                                   headLength2 * std::sin(angle4));
+    
+    return QPolygonF() << m_startPoint << arrowTop2 << arrowTop 
+                      << m_endPoint << arrowBot << arrowBot2;
+}
+
+inline void ArrowItem::drawArrow(QPainter *painter) const
+{
+    QPen pen(QColor(0, 0, 0, 0));
+    pen.setWidth(1);
+    painter->setPen(pen);
+    painter->setBrush(QBrush(Qt::green));
+    
+    QPolygonF arrow = createArrowPolygon();
+    if (!arrow.isEmpty()) {
+        painter->drawPolygon(arrow);
+    }
+}
+
+inline void ArrowItem::drawMask(QPainter *painter) const
+{
+    if (m_oldRectf.isEmpty()) {
+        return;
+    }
+    
+    QPen pen(QColor(0, 0, 0, 0));
+    pen.setWidth(1);
+    painter->setPen(pen);
+    painter->setBrush(QBrush(QColor(0, 0, 0, 150)));
+    
+    QPolygonF mask = createMaskPolygon();
+    if (!mask.isEmpty()) {
+        painter->drawPolygon(mask);
+    }
+}
+
+inline QPolygonF ArrowItem::createMaskPolygon() const
+{
+    if (m_oldRectf.isEmpty()) {
+        return QPolygonF();
+    }
+    
+    QPolygonF arrow = createArrowPolygon();
+    if (arrow.size() < 6) {
+        return QPolygonF();
+    }
+    
+    const QPointF &arrowTop2 = arrow[1];
+    const QPointF &arrowBot2 = arrow[5];
+    
+    QLineF line1(m_startPoint, arrowTop2);
+    QLineF line2(m_startPoint, arrowBot2);
+    
+    QPointF intersection1 = getLineRectIntersection(line1, m_oldRectf);
+    QPointF intersection2 = getLineRectIntersection(line2, m_oldRectf);
+    
+    if (intersection1.isNull() || intersection2.isNull()) {
+        return QPolygonF();
+    }
+    
+    QPolygonF maskArea;
+    maskArea << m_startPoint << intersection1 << intersection2;
+    
+    QPointF inPolyPoint;
+    if (isRectPointInPolygon(maskArea, m_oldRectf, &inPolyPoint)) {
+        maskArea.insert(2, inPolyPoint);
+    }
+    
+    return maskArea;
+}
+
+inline void ArrowItem::drawTargetCross(QPainter *painter) const
+{
+    QPen pen(Qt::yellow);
+    pen.setWidth(PEN_WIDTH);
+    painter->setPen(pen);
+    
+    const double x = m_endPoint.x();
+    const double y = m_endPoint.y();
+    
+    painter->drawLine(QLineF(x - CROSS_SIZE, y, x + CROSS_SIZE, y));
+    painter->drawLine(QLineF(x, y - CROSS_SIZE, x, y + CROSS_SIZE));
+}
+
+inline QPointF ArrowItem::getLineRectIntersection(const QLineF &line, const QRectF &rect) const
+{
+    QPointF intersection;
+    
+    // 检查与矩形四边的交点
+    const QLineF edges[4] = {
+        QLineF(rect.topLeft(), rect.topRight()),      // 顶边
+        QLineF(rect.topRight(), rect.bottomRight()),  // 右边
+        QLineF(rect.bottomRight(), rect.bottomLeft()), // 底边
+        QLineF(rect.bottomLeft(), rect.topLeft())     // 左边
+    };
+    
+    for (const auto &edge : edges) {
+        if (lineSegmentsIntersect(line, edge, &intersection)) {
+            return intersection;
+        }
+    }
+    
+    return QPointF(); // 无交点
+}
+
+inline bool ArrowItem::lineSegmentsIntersect(const QLineF &line1, const QLineF &line2, 
+                                           QPointF *intersectionPoint) const
+{
+    return line1.intersects(line2, intersectionPoint) == QLineF::BoundedIntersection;
+}
+
+inline bool ArrowItem::isRectPointInPolygon(const QPolygonF &polygon, const QRectF &rect, 
+                                          QPointF *intersectionPoint) const
+{
+    const QPointF corners[4] = {
+        rect.topLeft(),
+        rect.topRight(),
+        rect.bottomLeft(),
+        rect.bottomRight()
+    };
+    
+    for (const auto &corner : corners) {
+        if (polygon.containsPoint(corner, Qt::WindingFill)) {
+            if (intersectionPoint) {
+                *intersectionPoint = corner;
+            }
+            return true;
+        }
+    }
+    
+    return false;
+}
+
 #endif // DRAWARROW_H
