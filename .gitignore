@@ -1,0 +1,124 @@
+# Qt项目生成文件
+*.pro.user
+*.pro.user.*
+*.qbs.user
+*.qbs.user.*
+*.moc
+*.moc.cpp
+moc_*.cpp
+moc_*.h
+qrc_*.cpp
+ui_*.h
+*.qmlc
+*.jsc
+Makefile*
+*build-*
+
+# Qt Creator
+*.autosave
+
+# Qt i18n
+*.qm
+*.ts
+
+# QtTest
+target_wrapper.*
+
+# Qt Creator CMake
+CMakeLists.txt.user*
+
+# Qt Designer
+*.ui.autosave
+
+# 编译输出目录
+build/
+debug/
+release/
+Debug/
+Release/
+x64/
+Win32/
+
+# CMake生成文件
+CMakeFiles/
+CMakeCache.txt
+cmake_install.cmake
+*.cmake
+!CMakeLists.txt
+
+# Visual Studio / Qt Creator 生成文件
+*.vcxproj
+*.vcxproj.filters
+*.vcxproj.user
+*.sln
+*.suo
+*.user
+*.ncb
+*.aps
+*.plg
+*.opt
+*.clw
+*.pdb
+*.ilk
+*.exp
+*.idb
+*.res
+*.pch
+*.sbr
+*.tlb
+*.tli
+*.tlh
+*.tmp
+*.rsp
+*.pgc
+*.pgd
+*.meta
+*.tlog/
+*.log
+*.lastbuildstate
+*.iobj
+*.ipdb
+
+# 可执行文件
+*.exe
+*.app
+*.dSYM/
+
+# 动态链接库
+*.dll
+*.so
+*.dylib
+
+# 静态库
+*.lib
+*.a
+
+# 对象文件
+*.o
+*.obj
+
+# 临时文件
+*.tmp
+*.temp
+*~
+*.swp
+*.swo
+
+# 系统文件
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+desktop.ini
+
+# IDE配置文件
+.vscode/
+.idea/
+*.sublime-*
+
+# 自定义排除
+*.backup
+*.orig
