@@ -1,5 +1,11 @@
 # QtGraphicsLab - Interactive Graphics Framework
 
+## 项目展示
+
+![项目演示](./resource/images/demo_screenshot.png)
+
+> 交互式图形编辑界面 - 支持拖拽、旋转、缩放等操作
+
 ## 项目概述
 
 一个基于Qt Graphics Framework开发的高级图形交互实验室，实现了可拖拽、可旋转、可缩放的矩形图元，并集成了背景遮罩、箭头连接线等功能。该项目展示了现代C++和Qt框架在图形界面开发中的最佳实践。
