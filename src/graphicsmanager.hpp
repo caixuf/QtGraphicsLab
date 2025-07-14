@@ -8,8 +8,7 @@
 #include "mygraphicbackgrounditem.h"
 #include "globals.h"
 #include "mygraphicrectitem.h"
-#include "include/drawarrow.hpp"
-#include "resourcemanager.h"
+#include "drawarrow.hpp"
 #include "resourcemanager.h"
 
 class GraphicsManager : public QObject {

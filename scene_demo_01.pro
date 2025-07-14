@@ -18,10 +18,10 @@ SOURCES += \
     src/mygraphicrectitem.cpp
 
 HEADERS += \
-    include/drawarrow.hpp \
+    src/resourcemanager.h \
+    src/graphicsmanager.hpp \
+    src/drawarrow.hpp \
     src/globals.h \
-    include/graphicsmanager.hpp \
-    include/resourcemanager.h \
     src/mygraphicbackgrounditem.h\
     src/mygraphicrectitem.h
 
