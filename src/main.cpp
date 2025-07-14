@@ -1,6 +1,7 @@
-#ifndef SCENE_DEMO_01
-#define SCENE_DEMO_01
-//1.固定场景和视图的大小，使得场景正好和视图一样大，实现方式有直接固定大小以及通过重设大小的事件将视图大小和场景大小绑定，同时要考虑到视图最大不能超过显示器大小
+#ifndef QTGRAPHICSLAB_MAIN
+#define QTGRAPHICSLAB_MAIN
+// QtGraphicsLab - Interactive Graphics Framework
+// 实现固定场景和视图的大小，使得场景正好和视图一样大
 #include "graphicsmanager.hpp"
 
 int main(int argc, char *argv[])

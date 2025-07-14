@@ -1,8 +1,8 @@
-# Qt Graphics Framework - Interactive Rectangle Demo
+# QtGraphicsLab - Interactive Graphics Framework
 
 ## 项目概述
 
-一个基于Qt Graphics Framework开发的高级图形交互应用，实现了可拖拽、可旋转、可缩放的矩形图元，并集成了背景遮罩、箭头连接线等功能。该项目展示了现代C++和Qt框架在图形界面开发中的最佳实践。
+一个基于Qt Graphics Framework开发的高级图形交互实验室，实现了可拖拽、可旋转、可缩放的矩形图元，并集成了背景遮罩、箭头连接线等功能。该项目展示了现代C++和Qt框架在图形界面开发中的最佳实践。
 
 ## 核心技术特性
 
@@ -83,13 +83,13 @@ class ResourceManager {
 
 ```bash
 # 生成Makefile
-qmake scene_demo_01.pro
+qmake QtGraphicsLab.pro
 
 # 编译项目
 make
 
 # 运行程序
-./scene_demo_01
+./QtGraphicsLab
 ```
 
 ## 学习价值
@@ -97,7 +97,7 @@ make
 此项目适合作为Qt Graphics开发的学习案例，涵盖了：
 
 - Qt Graphics Framework的深度应用
-- 现代C++特性的实际运用
+- 现代C++特性的实际运用  
 - 图形界面交互设计模式
 - 高性能2D图形渲染技术
 
