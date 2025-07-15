@@ -12,7 +12,7 @@
 > 基于Qt Graphics Framework的高性能图形编辑器 - 支持拖拽、旋转、缩放等操作
 
 #### 2. QML 版本 (MaskView目录)  
-![QML 版本演示](./MaskView/image/a1.png)
+![QML 版本演示](./MaskView/image/qml_demo.png)
 
 > 基于Qt Quick的声明式UI实现 - 智能遮罩图像查看器
 
