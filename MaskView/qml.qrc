@@ -1,0 +1,8 @@
+<RCC>
+    <qresource prefix="/">
+        <file>main.qml</file>
+        <file>TDragRect.qml</file>
+        <file>TMoveArea.qml</file>
+        <file>TResizeBorder.qml</file>
+    </qresource>
+</RCC>
