@@ -27,6 +27,7 @@ enum STATE_FLAG{
 // myGraphicRectItem类，继承自QObject和QGraphicsItem，用于在图形场景中绘制和交互矩形项
 class myGraphicRectItem : public QObject, public QGraphicsItem {
     Q_OBJECT // 宏定义，用于支持Qt的信号和槽机制
+    Q_INTERFACES(QGraphicsItem) // 接口声明
 
 public:
     // 构造函数，允许指定父QGraphicsItem，默认为nullptr
@@ -169,6 +170,16 @@ private:
 
     //遮罩状态
     bool mark;
+
+    // 优化：几何计算缓存
+    mutable QRectF m_cachedRect;
+    mutable qreal m_cachedAngle;
+    mutable QPointF m_cachedCenter;
+    mutable bool m_cacheValid;
+    
+    // 缓存辅助方法
+    bool isCacheValid(const QRectF& rect, qreal angle, const QPointF& center) const;
+    void invalidateCache();
 
 signals:
     void centerChange(QPointF center);

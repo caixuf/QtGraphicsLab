@@ -14,6 +14,7 @@
 class ArrowItem : public QObject, public QGraphicsItem
 {
     Q_OBJECT
+    Q_INTERFACES(QGraphicsItem)
 
 public:
     explicit ArrowItem(QGraphicsItem *parent = nullptr);
@@ -64,7 +65,8 @@ private:
 
 // 实现部分
 inline ArrowItem::ArrowItem(QGraphicsItem *parent) 
-    : QGraphicsItem(parent)
+    : QObject()
+    , QGraphicsItem(parent)
     , m_startPoint()
     , m_endPoint()
     , m_oldRectf()
