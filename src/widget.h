@@ -2,12 +2,8 @@
 #define WIDGET_H
 
 #include <QWidget>
-
-QT_BEGIN_NAMESPACE
-namespace Ui {
-class Widget;
-}
-QT_END_NAMESPACE
+#include <QVBoxLayout>
+#include "graphicsmanager.hpp"
 
 class Widget : public QWidget
 {
@@ -17,7 +13,11 @@ public:
     Widget(QWidget *parent = nullptr);
     ~Widget();
 
+protected:
+    void resizeEvent(QResizeEvent *event) override;
+
 private:
-    Ui::Widget *ui;
+    GraphicsManager *manager;
+    QVBoxLayout *layout;
 };
 #endif // WIDGET_H

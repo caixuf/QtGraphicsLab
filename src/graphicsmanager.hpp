@@ -73,7 +73,7 @@ public:
         t4->setVisible(false);
         t5->setVisible(false);
         scene->setSceneRect(0, 0, WIDTH, HEIGHT);
-        view = new QGraphicsView();
+        view = new QGraphicsView();  // 不设置父窗口，由Widget来设置
         view->setScene(scene);
         view->resize(scene->width() + 3, scene->height() + 3);
         view->setSceneRect(scene->sceneRect());
@@ -151,6 +151,8 @@ public slots:
     // 新增：处理mark状态变化的槽函数 - 确保两个矩形的明暗状态互斥，并切换放大镜功能
     void onMarkChange(bool mark)
     {
+        Q_UNUSED(mark);  // 标记参数已使用，避免警告
+        
         // 找出是哪个矩形发出的信号
         myGraphicRectItem* sender = qobject_cast<myGraphicRectItem*>(QObject::sender());
         if (!sender) return;

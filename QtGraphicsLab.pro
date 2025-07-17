@@ -17,12 +17,14 @@ INCLUDEPATH += include \
 
 SOURCES += \
     src/main.cpp \
+    src/widget.cpp \
     src/mygraphicbackgrounditem.cpp\
     src/mygraphicrectitem.cpp \
     src/sharedresourcepool.cpp \
     src/geometrycache.cpp
 
 HEADERS += \
+    src/widget.h \
     src/resourcemanager.h \
     src/graphicsmanager.hpp \
     src/drawarrow.hpp \
