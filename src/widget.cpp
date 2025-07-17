@@ -3,22 +3,22 @@
 #include <QTimer>
 #include "globals.h"
 
-Widget::Widget(QWidget *parent)
+MainWidget::MainWidget(QWidget *parent)
     : QWidget(parent)
 {
     // 创建 GraphicsManager
-    manager = new GraphicsManager(this);
+    m_graphicsManager = new GraphicsManager(this);
     
     // 创建布局
-    layout = new QVBoxLayout(this);
-    layout->setContentsMargins(0, 0, 0, 0);
-    layout->setSpacing(0);
+    m_mainLayout = new QVBoxLayout(this);
+    m_mainLayout->setContentsMargins(0, 0, 0, 0);
+    m_mainLayout->setSpacing(0);
     
     // 将 GraphicsView 添加到布局中
-    layout->addWidget(manager->getView());
+    m_mainLayout->addWidget(m_graphicsManager->getView());
     
     // 配置 GraphicsView 的缩放和显示策略
-    QGraphicsView* view = manager->getView();
+    QGraphicsView* view = m_graphicsManager->getView();
     view->setResizeAnchor(QGraphicsView::AnchorViewCenter);
     view->setTransformationAnchor(QGraphicsView::AnchorViewCenter);
     view->setHorizontalScrollBarPolicy(Qt::ScrollBarAsNeeded);
@@ -33,28 +33,28 @@ Widget::Widget(QWidget *parent)
     
     // 初始化时使用fitInView自适应显示，这样放大镜功能可以正常工作
     QTimer::singleShot(0, this, [this]() {
-        if (manager && manager->getView() && manager->getScene()) {
-            QGraphicsView* view = manager->getView();
-            QGraphicsScene* scene = manager->getScene();
+        if (m_graphicsManager && m_graphicsManager->getView() && m_graphicsManager->getScene()) {
+            QGraphicsView* view = m_graphicsManager->getView();
+            QGraphicsScene* scene = m_graphicsManager->getScene();
             // 使用KeepAspectRatio保持宽高比的自适应显示
             view->fitInView(scene->sceneRect(), Qt::KeepAspectRatio);
         }
     });
 }
 
-Widget::~Widget()
+MainWidget::~MainWidget()
 {
-    // manager 会在父对象销毁时自动销毁
+    // m_graphicsManager 会在父对象销毁时自动销毁
 }
 
-void Widget::resizeEvent(QResizeEvent *event)
+void MainWidget::resizeEvent(QResizeEvent *event)
 {
     QWidget::resizeEvent(event);
     
     // 当窗口大小变化时，让场景内容填充整个窗口
-    if (manager && manager->getView() && manager->getScene()) {
-        QGraphicsView* view = manager->getView();
-        QGraphicsScene* scene = manager->getScene();
+    if (m_graphicsManager && m_graphicsManager->getView() && m_graphicsManager->getScene()) {
+        QGraphicsView* view = m_graphicsManager->getView();
+        QGraphicsScene* scene = m_graphicsManager->getScene();
         
         // 使用 fitInView 让场景完全填充视图
         view->fitInView(scene->sceneRect(), Qt::IgnoreAspectRatio);

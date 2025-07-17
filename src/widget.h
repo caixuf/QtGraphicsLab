@@ -1,23 +1,24 @@
-#ifndef WIDGET_H
-#define WIDGET_H
+#ifndef MAINWIDGET_H
+#define MAINWIDGET_H
 
 #include <QWidget>
 #include <QVBoxLayout>
 #include "graphicsmanager.hpp"
 
-class Widget : public QWidget
+class MainWidget : public QWidget
 {
     Q_OBJECT
 
 public:
-    Widget(QWidget *parent = nullptr);
-    ~Widget();
+    MainWidget(QWidget *parent = nullptr);
+    ~MainWidget();
 
 protected:
     void resizeEvent(QResizeEvent *event) override;
 
 private:
-    GraphicsManager *manager;
-    QVBoxLayout *layout;
+    GraphicsManager *m_graphicsManager;
+    QVBoxLayout *m_mainLayout;
 };
-#endif // WIDGET_H
+
+#endif // MAINWIDGET_H
