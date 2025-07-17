@@ -10,6 +10,7 @@
 #include "mygraphicrectitem.h"
 #include "drawarrow.hpp"
 #include "resourcemanager.h"
+#include "sharedresourcepool.h"
 
 class GraphicsManager : public QObject {
     Q_OBJECT
@@ -53,6 +54,10 @@ public:
         connect(t1, &myGraphicRectItem::markChange, t, &myGraphicRectItem::setMark);
         connect(t, &myGraphicRectItem::showMid, this, &GraphicsManager::showMid);
         connect(t1, &myGraphicRectItem::showMid, this, &GraphicsManager::showMid);
+        
+        // 输出共享资源池的统计信息
+        qDebug() << "GraphicsManager initialized. SharedResourcePool cache size:" 
+                 << SharedResourcePool::instance().getCacheSize();
     }
 
     QGraphicsView *getView() const { return view; }

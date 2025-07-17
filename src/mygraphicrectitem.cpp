@@ -38,10 +38,8 @@ myGraphicRectItem::myGraphicRectItem(QSizeF size, QString imagePath):
     QString actualPath = imagePath.isEmpty() ? 
         ResourceManager::instance().getImagePath(ResourceManager::DEFAULT_RECT) : imagePath;
     
-    QPixmap originalPixmap = QPixmap(actualPath);
-    int newWidth = WIDTH; // 新的宽度
-    int newHeight = HEIGHT; // 新的高度
-    pixmap = originalPixmap.scaled(newWidth, newHeight);
+    // 使用共享资源池获取缩放后的图片，减少内存使用
+    pixmap = SharedResourcePool::instance().getScaledPixmap(actualPath, WIDTH, HEIGHT);
 }
 
 QRectF myGraphicRectItem::boundingRect() const

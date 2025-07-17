@@ -13,6 +13,7 @@
 #include <QList>
 #include <globals.h>
 #include "resourcemanager.h"
+#include "sharedresourcepool.h"
 enum STATE_FLAG{
     DEFAULT_FLAG = 0,
     MOV_LEFT_LINE,//标记当前为用户按下矩形的左边界区域

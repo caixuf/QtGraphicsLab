@@ -18,7 +18,8 @@ INCLUDEPATH += include \
 SOURCES += \
     src/main.cpp \
     src/mygraphicbackgrounditem.cpp\
-    src/mygraphicrectitem.cpp
+    src/mygraphicrectitem.cpp \
+    src/sharedresourcepool.cpp
 
 HEADERS += \
     src/resourcemanager.h \
@@ -26,7 +27,8 @@ HEADERS += \
     src/drawarrow.hpp \
     src/globals.h \
     src/mygraphicbackgrounditem.h\
-    src/mygraphicrectitem.h
+    src/mygraphicrectitem.h \
+    src/sharedresourcepool.h
 
 FORMS +=
 
