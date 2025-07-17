@@ -19,7 +19,8 @@ SOURCES += \
     src/main.cpp \
     src/mygraphicbackgrounditem.cpp\
     src/mygraphicrectitem.cpp \
-    src/sharedresourcepool.cpp
+    src/sharedresourcepool.cpp \
+    src/geometrycache.cpp
 
 HEADERS += \
     src/resourcemanager.h \
@@ -28,7 +29,8 @@ HEADERS += \
     src/globals.h \
     src/mygraphicbackgrounditem.h\
     src/mygraphicrectitem.h \
-    src/sharedresourcepool.h
+    src/sharedresourcepool.h \
+    src/geometrycache.h
 
 FORMS +=
 

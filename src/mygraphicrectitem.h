@@ -14,6 +14,7 @@
 #include <globals.h>
 #include "resourcemanager.h"
 #include "sharedresourcepool.h"
+#include "geometrycache.h"
 enum STATE_FLAG{
     DEFAULT_FLAG = 0,
     MOV_LEFT_LINE,//标记当前为用户按下矩形的左边界区域
@@ -181,6 +182,9 @@ private:
     // 缓存辅助方法
     bool isCacheValid(const QRectF& rect, qreal angle, const QPointF& center) const;
     void invalidateCache();
+    
+    // LOD渲染方法
+    void drawHighDetail(QPainter *painter, const QRectF &target);
 
 signals:
     void centerChange(QPointF center);

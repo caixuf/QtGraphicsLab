@@ -123,12 +123,67 @@ void myGraphicRectItem::paint(QPainter *painter, const QStyleOptionGraphicsItem 
     Q_UNUSED(option)
     Q_UNUSED(widget)
     
+    // LOD渲染：根据缩放级别选择不同的渲染细节
+    qreal scaleFactor = painter->transform().m11(); // 获取X方向的缩放因子
+    
     QRectF target = m_oldRectPolygon.boundingRect();
-    QRectF souce = QRectF(this->pos().x(), this->pos().y(), target.width(), target.height());
-    painter->drawPixmap(target, pixmap, souce);
-    QPen mPen = QPen(Qt::yellow);
-    painter->setPen(mPen);
-    mPen.setWidth(1);
+    
+    if (scaleFactor < 0.3) {
+        // 极低细节渲染：只绘制简单的填充矩形
+        painter->fillRect(target, Qt::blue);
+        return;
+    }
+    else if (scaleFactor < 0.6) {
+        // 低细节渲染：只绘制图片，不绘制控制点
+        QRectF source = QRectF(this->pos().x(), this->pos().y(), target.width(), target.height());
+        painter->drawPixmap(target, pixmap, source);
+        
+        // 只绘制选择边框
+        if (mark) {
+            QPen pen(Qt::black);
+            pen.setWidth(2);
+            painter->setPen(pen);
+            painter->drawRect(target);
+        }
+        return;
+    }
+    else if (scaleFactor < 1.0) {
+        // 中等细节：绘制图片和主要控制点
+        QRectF source = QRectF(this->pos().x(), this->pos().y(), target.width(), target.height());
+        painter->drawPixmap(target, pixmap, source);
+        
+        QPen pen(Qt::yellow);
+        pen.setWidth(1);
+        painter->setPen(pen);
+        
+        // 只绘制四个角的控制点
+        painter->fillRect(m_rightAndBottomRectf, Qt::yellow);
+        painter->fillRect(m_leftAndTopRectf, Qt::yellow);
+        painter->fillRect(m_rightAndTopRectf, Qt::yellow);
+        painter->fillRect(m_leftAndBottomRectf, Qt::yellow);
+        
+        painter->drawRect(target);
+        if (mark) {
+            painter->fillRect(QRectF(target.x(), target.y(), target.width() + 2, target.height() + 2), QColor(0, 0, 0, 150));
+        }
+        return;
+    }
+    
+    // 高细节渲染：完整的控制点和装饰
+    drawHighDetail(painter, target);
+}
+
+void myGraphicRectItem::drawHighDetail(QPainter *painter, const QRectF &target)
+{
+    // 绘制主要图片
+    QRectF source = QRectF(this->pos().x(), this->pos().y(), target.width(), target.height());
+    painter->drawPixmap(target, pixmap, source);
+    
+    // 绘制所有控制点
+    QPen pen(Qt::yellow);
+    pen.setWidth(1);
+    painter->setPen(pen);
+    
     painter->drawRect(m_leftRectf);
     painter->drawRect(m_rightRectf);
     painter->drawRect(m_bottomRectf);
@@ -138,6 +193,7 @@ void myGraphicRectItem::paint(QPainter *painter, const QStyleOptionGraphicsItem 
     painter->drawRect(m_leftAndTopRectf);
     painter->drawRect(m_leftAndBottomRectf);
     painter->drawRect(target);
+    
     painter->fillRect(m_leftRectf, Qt::yellow);
     painter->fillRect(m_rightRectf, Qt::yellow);
     painter->fillRect(m_topRectf, Qt::yellow);
@@ -146,18 +202,10 @@ void myGraphicRectItem::paint(QPainter *painter, const QStyleOptionGraphicsItem 
     painter->fillRect(m_leftAndTopRectf, Qt::yellow);
     painter->fillRect(m_rightAndTopRectf, Qt::yellow);
     painter->fillRect(m_leftAndBottomRectf, Qt::yellow);
-    if(mark) painter->fillRect(QRectF(target.x(), target.y(), target.width() + 2, target.height() + 2), QColor(0, 0, 0, 150));
-    // QPen mPen1 = QPen(Qt::yellow);
-    // painter->setPen(mPen1);
-    // painter->drawPolygon(m_oldRectPolygon);
-    // //绘制旋转圆形
-    // mPen.setWidth(2);
-    // mPen.setColor(Qt::green);
-    // painter->setPen(mPen);
-    // QPointF pf = getSmallRotateRectCenter(m_oldRectPolygon[0],m_oldRectPolygon[1]);
-    // QRectF rect = QRectF(pf.x()-10,pf.y()-10,20,20);
-    // painter->drawEllipse(rect);//绘制圆形
-    // painter->drawPoint(pf);//绘制点
+    
+    if (mark) {
+        painter->fillRect(QRectF(target.x(), target.y(), target.width() + 2, target.height() + 2), QColor(0, 0, 0, 150));
+    }
 }
 
 void myGraphicRectItem::mousePressEvent(QGraphicsSceneMouseEvent *event)
@@ -544,25 +592,8 @@ QList<QPointF> myGraphicRectItem::getRotatePoints(QPointF ptCenter, QList<QPoint
 
 QPolygonF myGraphicRectItem::getRotatePolygonFromRect(QPointF ptCenter, QRectF &rectIn, qreal angle)
 {
-    QVector<QPointF> vpt;
-
-    // 左上角点
-    QPointF topLeft = getRotatePoint(ptCenter, rectIn.topLeft(), angle);
-    vpt.append(topLeft);
-
-    // 右上角点
-    QPointF topRight = getRotatePoint(ptCenter, rectIn.topRight(), angle);
-    vpt.append(topRight);
-
-    // 右下角点
-    QPointF bottomRight = getRotatePoint(ptCenter, rectIn.bottomRight(), angle);
-    vpt.append(bottomRight);
-
-    // 左下角点
-    QPointF bottomLeft = getRotatePoint(ptCenter, rectIn.bottomLeft(), angle);
-    vpt.append(bottomLeft);
-
-    return QPolygonF(vpt);
+    // 使用几何缓存优化旋转多边形计算
+    return GeometryCache::instance().getCachedRotatedPolygon(rectIn, angle, ptCenter);
 }
 
 QRectF myGraphicRectItem::getCrtPosRectToSceen()
