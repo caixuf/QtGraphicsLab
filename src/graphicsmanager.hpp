@@ -263,12 +263,19 @@ private:
             }
             
             if (selector && magnifier) {
-                // 获取选择器的位置和大小
-                QRectF selectorRect = selector->getOldRect();
+                // 获取选择器在场景中的位置和大小
+                QRectF selectorSceneRect = selector->getOldRect();
                 
-                // 将选择器的位置映射到背景图像的坐标系
-                // 这里假设背景图像填充整个场景
-                magnifier->setSelectionRect(selectorRect);
+                // 将选择器的场景坐标转换为背景图像中的相对坐标
+                // 背景图像坐标系是 (0,0) 到 (WIDTH, HEIGHT)
+                // 确保选择区域在背景图像范围内
+                qreal x = qMax(0.0, qMin(selectorSceneRect.x(), (qreal)WIDTH - selectorSceneRect.width()));
+                qreal y = qMax(0.0, qMin(selectorSceneRect.y(), (qreal)HEIGHT - selectorSceneRect.height()));
+                qreal w = qMin(selectorSceneRect.width(), (qreal)WIDTH - x);
+                qreal h = qMin(selectorSceneRect.height(), (qreal)HEIGHT - y);
+                
+                QRectF backgroundImageRect(x, y, w, h);
+                magnifier->setSelectionRect(backgroundImageRect);
             }
         }
     }

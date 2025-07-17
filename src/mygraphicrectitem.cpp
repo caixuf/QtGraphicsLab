@@ -137,13 +137,24 @@ void myGraphicRectItem::paint(QPainter *painter, const QStyleOptionGraphicsItem 
         return;
     }
     else if (scaleFactor < 0.6) {
-        // 低细节渲染：只绘制图片，不绘制控制点
-        QRectF source = QRectF(this->pos().x(), this->pos().y(), target.width(), target.height());
-        painter->drawPixmap(target, pixmap, source);
+        // 低细节渲染：但是放大镜模式需要特殊处理
+        if (m_isMagnifierMode && !m_backgroundImage.isNull() && m_selectionRect.isValid()) {
+            // 放大镜模式：显示放大内容
+            drawHighDetail(painter, target);
+        } else {
+            // 普通模式：只绘制图片，不绘制控制点
+            QRectF source = QRectF(this->pos().x(), this->pos().y(), target.width(), target.height());
+            painter->drawPixmap(target, pixmap, source);
+        }
         
         // 只绘制选择边框
-        if (mark) {
+        if (!m_isMagnifierMode && mark) {
             QPen pen(Qt::black);
+            pen.setWidth(2);
+            painter->setPen(pen);
+            painter->drawRect(target);
+        } else if (m_isMagnifierMode) {
+            QPen pen(Qt::cyan);
             pen.setWidth(2);
             painter->setPen(pen);
             painter->drawRect(target);
@@ -152,21 +163,28 @@ void myGraphicRectItem::paint(QPainter *painter, const QStyleOptionGraphicsItem 
     }
     else if (scaleFactor < 1.0) {
         // 中等细节：绘制图片和主要控制点
-        QRectF source = QRectF(this->pos().x(), this->pos().y(), target.width(), target.height());
-        painter->drawPixmap(target, pixmap, source);
+        // 但是如果是放大镜模式，需要特殊处理
+        if (m_isMagnifierMode && !m_backgroundImage.isNull() && m_selectionRect.isValid()) {
+            // 放大镜模式优先：即使在中等细节级别也要显示放大镜内容
+            drawHighDetail(painter, target);
+        } else {
+            // 普通模式：显示原始图片
+            QRectF source = QRectF(this->pos().x(), this->pos().y(), target.width(), target.height());
+            painter->drawPixmap(target, pixmap, source);
+        }
         
-        QPen pen(Qt::yellow);
+        QPen pen(m_isMagnifierMode ? Qt::cyan : Qt::yellow);
         pen.setWidth(1);
         painter->setPen(pen);
         
         // 只绘制四个角的控制点
-        painter->fillRect(m_rightAndBottomRectf, Qt::yellow);
-        painter->fillRect(m_leftAndTopRectf, Qt::yellow);
-        painter->fillRect(m_rightAndTopRectf, Qt::yellow);
-        painter->fillRect(m_leftAndBottomRectf, Qt::yellow);
+        painter->fillRect(m_rightAndBottomRectf, m_isMagnifierMode ? Qt::cyan : Qt::yellow);
+        painter->fillRect(m_leftAndTopRectf, m_isMagnifierMode ? Qt::cyan : Qt::yellow);
+        painter->fillRect(m_rightAndTopRectf, m_isMagnifierMode ? Qt::cyan : Qt::yellow);
+        painter->fillRect(m_leftAndBottomRectf, m_isMagnifierMode ? Qt::cyan : Qt::yellow);
         
         painter->drawRect(target);
-        if (mark) {
+        if (!m_isMagnifierMode && mark) {
             painter->fillRect(QRectF(target.x(), target.y(), target.width() + 2, target.height() + 2), QColor(0, 0, 0, 150));
         }
         return;

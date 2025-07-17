@@ -1,6 +1,7 @@
 #include "widget.h"
 #include <QResizeEvent>
 #include <QTimer>
+#include "globals.h"
 
 Widget::Widget(QWidget *parent)
     : QWidget(parent)
@@ -26,16 +27,17 @@ Widget::Widget(QWidget *parent)
     // 设置窗口标题
     setWindowTitle("Qt Graphics Lab - Magnifier Demo");
     
-    // 设置最小尺寸，但允许调整大小
-    setMinimumSize(manager->getView()->size());
-    resize(manager->getView()->size());
+    // 设置窗口尺寸直接使用globals.h中定义的尺寸
+    setMinimumSize(400, 300);  // 设置合理的最小尺寸
+    resize(WIDTH, HEIGHT);     // 使用globals.h中定义的标准尺寸
     
-    // 初始化时设置合适的视图缩放，让场景填充整个视图
+    // 初始化时使用fitInView自适应显示，这样放大镜功能可以正常工作
     QTimer::singleShot(0, this, [this]() {
         if (manager && manager->getView() && manager->getScene()) {
             QGraphicsView* view = manager->getView();
             QGraphicsScene* scene = manager->getScene();
-            view->fitInView(scene->sceneRect(), Qt::IgnoreAspectRatio);
+            // 使用KeepAspectRatio保持宽高比的自适应显示
+            view->fitInView(scene->sceneRect(), Qt::KeepAspectRatio);
         }
     });
 }
