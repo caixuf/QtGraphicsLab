@@ -91,6 +91,13 @@ public:
     //返回OldRect在场景中的坐标
     QRectF getOldRect();
 
+    // 放大镜相关方法
+    void setMagnifierMode(bool isMagnifier);
+    void setBackgroundImage(const QPixmap& bgImage);
+    void setSelectionRect(const QRectF& selectionRect);
+    void setZoomFactor(qreal factor);
+    bool isMagnifierMode() const { return m_isMagnifierMode; }
+    bool getMark() const { return mark; }  // 获取mark状态
 
     // 标记是否正在旋转
     bool m_bRotate;
@@ -173,6 +180,16 @@ private:
     //遮罩状态
     bool mark;
 
+    // 放大镜相关成员
+    bool m_isMagnifierMode;        // 是否为放大镜模式
+    QPixmap m_backgroundImage;     // 背景图像
+    QRectF m_selectionRect;        // 选择区域（在背景图像中的位置）
+    qreal m_zoomFactor;            // 放大倍数
+
+    // 鼠标交互状态跟踪
+    bool m_hasDragged;             // 是否发生了拖拽
+    QPointF m_pressPos;            // 鼠标按下时的位置
+
     // 优化：几何计算缓存
     mutable QRectF m_cachedRect;
     mutable qreal m_cachedAngle;
@@ -190,6 +207,9 @@ signals:
     void centerChange(QPointF center);
     void markChange(bool mark);
     void showMid(int sign);
+    // 放大镜相关信号
+    void selectionRectChanged(const QRectF& rect);  // 选择区域发生变化
+    void magnifierUpdateNeeded();                   // 需要更新放大镜内容
 public slots:
     void setMark(bool otherMark);
 

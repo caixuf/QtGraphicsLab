@@ -25,7 +25,10 @@ myGraphicRectItem::myGraphicRectItem(QSizeF size, QString imagePath):
     m_oldRect(0, 0, size.width(), size.height()),
     m_bResize(false),
     m_StateFlag(DEFAULT_FLAG),
-    m_cacheValid(false)  // 初始化缓存状态
+    m_isMagnifierMode(false),  // 按照头文件中的声明顺序
+    m_zoomFactor(1.0),         // 按照头文件中的声明顺序
+    m_hasDragged(false),       // 初始化拖拽状态
+    m_cacheValid(false)        // 最后初始化缓存状态
 {
     mark = true;
     setRectSize(m_oldRect); //根据传入的矩形设置组成图元的几个区域
@@ -175,12 +178,44 @@ void myGraphicRectItem::paint(QPainter *painter, const QStyleOptionGraphicsItem 
 
 void myGraphicRectItem::drawHighDetail(QPainter *painter, const QRectF &target)
 {
-    // 绘制主要图片
-    QRectF source = QRectF(this->pos().x(), this->pos().y(), target.width(), target.height());
-    painter->drawPixmap(target, pixmap, source);
+    if (m_isMagnifierMode && !m_backgroundImage.isNull() && m_selectionRect.isValid()) {
+        // 放大镜模式：绘制选择区域的放大内容
+        
+        // 从背景图像中提取选择区域
+        QPixmap sourcePixmap = m_backgroundImage.copy(m_selectionRect.toRect());
+        
+        if (!sourcePixmap.isNull()) {
+            // 应用平滑变换
+            painter->setRenderHint(QPainter::SmoothPixmapTransform, true);
+            
+            // 绘制放大的内容 - 使用完整的源矩形
+            QRectF sourceRect(0, 0, sourcePixmap.width(), sourcePixmap.height());
+            painter->drawPixmap(target, sourcePixmap, sourceRect);
+            
+            // 绘制放大镜边框（更亮的边框表示这是放大镜）
+            QPen magnifierPen(Qt::white, 3);
+            painter->setPen(magnifierPen);
+            painter->drawRect(target);
+            
+            // 内边框
+            QPen innerPen(Qt::cyan, 1);
+            painter->setPen(innerPen);
+            QRectF innerTarget = target.adjusted(2, 2, -2, -2);
+            painter->drawRect(innerTarget);
+        }
+    } else {
+        // 普通模式：绘制原始图片
+        QRectF source = QRectF(this->pos().x(), this->pos().y(), target.width(), target.height());
+        painter->drawPixmap(target, pixmap, source);
+        
+        // 如果是选择器模式（暗的矩形），绘制半透明遮罩
+        if (!m_isMagnifierMode && mark) {
+            painter->fillRect(QRectF(target.x(), target.y(), target.width() + 2, target.height() + 2), QColor(0, 0, 0, 150));
+        }
+    }
     
     // 绘制所有控制点
-    QPen pen(Qt::yellow);
+    QPen pen(m_isMagnifierMode ? Qt::cyan : Qt::yellow);
     pen.setWidth(1);
     painter->setPen(pen);
     
@@ -194,18 +229,15 @@ void myGraphicRectItem::drawHighDetail(QPainter *painter, const QRectF &target)
     painter->drawRect(m_leftAndBottomRectf);
     painter->drawRect(target);
     
-    painter->fillRect(m_leftRectf, Qt::yellow);
-    painter->fillRect(m_rightRectf, Qt::yellow);
-    painter->fillRect(m_topRectf, Qt::yellow);
-    painter->fillRect(m_bottomRectf, Qt::yellow);
-    painter->fillRect(m_rightAndBottomRectf, Qt::yellow);
-    painter->fillRect(m_leftAndTopRectf, Qt::yellow);
-    painter->fillRect(m_rightAndTopRectf, Qt::yellow);
-    painter->fillRect(m_leftAndBottomRectf, Qt::yellow);
-    
-    if (mark) {
-        painter->fillRect(QRectF(target.x(), target.y(), target.width() + 2, target.height() + 2), QColor(0, 0, 0, 150));
-    }
+    QColor fillColor = m_isMagnifierMode ? Qt::cyan : Qt::yellow;
+    painter->fillRect(m_leftRectf, fillColor);
+    painter->fillRect(m_rightRectf, fillColor);
+    painter->fillRect(m_topRectf, fillColor);
+    painter->fillRect(m_bottomRectf, fillColor);
+    painter->fillRect(m_rightAndBottomRectf, fillColor);
+    painter->fillRect(m_leftAndTopRectf, fillColor);
+    painter->fillRect(m_rightAndTopRectf, fillColor);
+    painter->fillRect(m_leftAndBottomRectf, fillColor);
 }
 
 void myGraphicRectItem::mousePressEvent(QGraphicsSceneMouseEvent *event)
@@ -215,12 +247,11 @@ void myGraphicRectItem::mousePressEvent(QGraphicsSceneMouseEvent *event)
     if(event->button()== Qt::LeftButton)
     {
         emit centerChange(this->pos() + QPointF(m_oldRect.width() / 2, m_oldRect.height() / 2));
-        if(mark)
-        {
-            mark = false;
-        }
-        emit markChange(mark);
-        update();
+        
+        // 记录鼠标按下位置，用于判断是否为选择操作
+        m_pressPos = event->scenePos();
+        m_hasDragged = false;
+        
         m_startPos = event->pos();
         // if(m_SmallRotatePolygon.containsPoint(m_startPos,Qt::WindingFill))//旋转矩形
         // {
@@ -270,6 +301,15 @@ void myGraphicRectItem::mousePressEvent(QGraphicsSceneMouseEvent *event)
 
 void myGraphicRectItem::mouseMoveEvent(QGraphicsSceneMouseEvent *event)
 {
+    // 检测是否发生了拖拽（鼠标移动超过一定距离）
+    if (!m_hasDragged) {
+        QPointF currentPos = event->scenePos();
+        qreal distance = QLineF(m_pressPos, currentPos).length();
+        if (distance > 3.0) { // 移动超过3像素认为是拖拽
+            m_hasDragged = true;
+        }
+    }
+    
     if(m_StateFlag == ROTATE)
     {
         int nRotateAngle = atan2((event->pos().x() - m_RotateCenter.x()),
@@ -530,12 +570,27 @@ void myGraphicRectItem::mouseMoveEvent(QGraphicsSceneMouseEvent *event)
 
     }
     emit centerChange(this->pos() + QPointF(m_oldRect.width() / 2, m_oldRect.height() / 2));
+    
+    // 如果不是放大镜模式（即为选择器），发射选择区域变化信号
+    if (!m_isMagnifierMode) {
+        QRectF currentRect = getOldRect(); // 获取在场景中的位置
+        emit selectionRectChanged(currentRect);
+    }
 }
 
 void myGraphicRectItem::mouseReleaseEvent(QGraphicsSceneMouseEvent *event)
 {
     emit showMid(0);
     setCursor(Qt::ArrowCursor);
+    
+    // 只有在没有拖拽的情况下才处理选择逻辑
+    if (!m_hasDragged && event->button() == Qt::LeftButton) {
+        // 这是一个选择操作，切换 mark 状态
+        mark = !mark;  // 简单的切换逻辑
+        emit markChange(mark);
+        update();
+    }
+    
     if(m_StateFlag == MOV_RECT)
     {
         m_StateFlag = DEFAULT_FLAG;
@@ -543,6 +598,9 @@ void myGraphicRectItem::mouseReleaseEvent(QGraphicsSceneMouseEvent *event)
     else {
         QGraphicsItem::mouseReleaseEvent(event);
     }
+    
+    // 重置拖拽状态
+    m_hasDragged = false;
 }
 
 void myGraphicRectItem::SetRotate(qreal RotateAngle, QPointF ptCenter)
@@ -630,11 +688,8 @@ QRectF myGraphicRectItem::getOldRect()
 
 void myGraphicRectItem::setMark(bool otherMark)
 {
-    if(!otherMark) //只能有一个遮罩亮着
-    {
-        this->mark = true;
-        update();
-    }
+    this->mark = otherMark;  // 直接设置mark状态
+    update();
 }
 QPointF myGraphicRectItem::getSmallRotateRectCenter(QPointF ptA, QPointF ptB)
 {
@@ -690,4 +745,42 @@ bool myGraphicRectItem::isCacheValid(const QRectF& rect, qreal angle, const QPoi
 void myGraphicRectItem::invalidateCache()
 {
     m_cacheValid = false;
+}
+
+// 放大镜相关方法实现
+void myGraphicRectItem::setMagnifierMode(bool isMagnifier)
+{
+    if (m_isMagnifierMode != isMagnifier) {
+        m_isMagnifierMode = isMagnifier;
+        update(); // 重新绘制
+    }
+}
+
+void myGraphicRectItem::setBackgroundImage(const QPixmap& bgImage)
+{
+    m_backgroundImage = bgImage;
+    if (m_isMagnifierMode) {
+        update(); // 重新绘制放大镜内容
+    }
+}
+
+void myGraphicRectItem::setSelectionRect(const QRectF& selectionRect)
+{
+    if (m_selectionRect != selectionRect) {
+        m_selectionRect = selectionRect;
+        if (m_isMagnifierMode) {
+            update(); // 重新绘制放大镜内容
+            emit magnifierUpdateNeeded();
+        }
+    }
+}
+
+void myGraphicRectItem::setZoomFactor(qreal factor)
+{
+    if (m_zoomFactor != factor) {
+        m_zoomFactor = qMax(0.1, factor); // 确保放大倍数不为负或零
+        if (m_isMagnifierMode) {
+            update(); // 重新绘制放大镜内容
+        }
+    }
 }
