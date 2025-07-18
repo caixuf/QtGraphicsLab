@@ -590,6 +590,84 @@ private slots:
   - 实时比例调整：放大镜根据选择器尺寸动态调整显示内容
   - 视觉区分：放大镜使用青色边框，选择器使用黄色边框
 
+#### **第五阶段：超分辨率图像增强系统** ✅
+
+- ✅ **多级质量控制系统**：
+  - 🚀 **快速模式**：Qt内置SmoothTransformation，适用于实时预览
+  - ⚡ **平衡模式**：多步骤缩放算法，兼顾质量与性能
+  - 🎯 **高质量模式**：超分辨率算法 + 边缘保持技术
+  - 💎 **超高质量模式**：终极算法组合（Lanczos重采样 + 色彩空间优化）
+
+- ✅ **先进的超分辨率算法**：
+  - **双三次插值**：基于16像素窗口的高精度插值
+  - **Lanczos重采样**：6阶核心的专业级图像缩放
+  - **边缘保持放大**：Sobel边缘检测 + 自适应锐化
+  - **多级细节增强**：4倍超采样 + 多层次处理
+
+- ✅ **智能图像增强技术**：
+  - **自适应边缘增强**：5级边缘检测 + 局部对比度分析
+  - **色彩空间优化**：YUV色彩空间 + 亮度对比度增强
+  - **噪声抑制**：高斯滤波 + 细节保护
+  - **多步骤质量优化**：渐进式处理管道
+
+- ✅ **用户友好的控制界面**：
+  - 实时质量级别切换（4档可调）
+  - 背景遮罩透明度控制（0-60%可调）
+  - 工具提示显示当前设置和性能说明
+  - 一键切换无需重启应用
+
+### 🔬 **超分辨率技术详解**
+
+#### **1. 双三次插值算法**
+
+```cpp
+// 使用16像素窗口进行高精度插值
+qreal bicubicWeight(qreal x, qreal a = -0.75) {
+    x = qAbs(x);
+    if (x <= 1.0) return (a + 2.0) * x³ - (a + 3.0) * x² + 1.0;
+    else if (x < 2.0) return a * x³ - 5.0 * a * x² + 8.0 * a * x - 4.0 * a;
+    else return 0.0;
+}
+```
+
+#### **2. Lanczos重采样**
+
+```cpp
+// 6阶Lanczos核心，专业级图像缩放
+qreal lanczosWeight(qreal x, int a = 3) {
+    if (x == 0) return 1.0;
+    if (qAbs(x) >= a) return 0.0;
+    return (sin(π*x) / (π*x)) * (sin(π*x/a) / (π*x/a));
+}
+```
+
+#### **3. 边缘保持技术**
+
+```cpp
+// 使用Sobel算子检测边缘强度
+qreal detectEdgeStrength(const QImage& image, int x, int y) {
+    // 计算X和Y方向的梯度
+    int sobelX = applyKernel(image, x, y, SOBEL_X_KERNEL);
+    int sobelY = applyKernel(image, x, y, SOBEL_Y_KERNEL);
+    return sqrt(sobelX² + sobelY²);
+}
+```
+
+#### **4. 色彩空间优化**
+
+```cpp
+// YUV色彩空间增强
+void enhanceInYUVSpace(QImage& image) {
+    for (each pixel) {
+        rgbToYuv(r, g, b, Y, U, V);
+        Y *= contrastFactor;     // 增强亮度对比度
+        U *= saturationFactor;   // 调整色度饱和度
+        V *= saturationFactor;
+        yuvToRgb(Y, U, V, r, g, b);
+    }
+}
+```
+
 ### 📈 **实际性能提升效果**
 
 通过四阶段系统性优化，实际获得的性能提升：
@@ -653,7 +731,9 @@ public:
 ### 🔍 **关键技术突破**
 
 #### **LOD与功能兼容性**
+
 解决了性能优化与功能完整性的矛盾，实现了：
+
 - 高性能：根据视图缩放自动调整渲染细节
 - 功能完整：关键功能（如放大镜）在所有级别都可用
 - 智能切换：动态检测功能需求，优先保证用户体验
