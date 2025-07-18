@@ -280,12 +280,15 @@ private:
         }
     }
 
-private:
-    QGraphicsView *view;
-    QGraphicsScene *scene;
+public:
+    // 公开成员变量以便外部访问
     myGraphicRectItem *selectorRect;        // 选择器矩形
     myGraphicRectItem *magnifierRect;       // 放大镜矩形
     MyGraphicBackgroundItem *backgroundItem; // 背景图像项
+
+private:
+    QGraphicsView *view;
+    QGraphicsScene *scene;
     ArrowItem *connectionArrow;             // 连接箭头
     QGraphicsRectItem *verticalGuideLine;   // 垂直辅助线
     QGraphicsRectItem *horizontalGuideLine; // 水平辅助线

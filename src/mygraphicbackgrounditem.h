@@ -22,6 +22,8 @@ public:
     MyGraphicBackgroundItem(QGraphicsItem *parent = nullptr);
     MyGraphicBackgroundItem(QString imagePath, QSizeF size);
     void setSize(const QSizeF &size);
+    void setMaskOpacity(qreal opacity);
+    qreal getMaskOpacity() const { return m_maskOpacity; }
     QRectF boundingRect() const override;
     QPainterPath shape() const override;
     void paint(QPainter *painter, const QStyleOptionGraphicsItem *option, QWidget *widget) override;
@@ -29,7 +31,8 @@ public:
 
 private:
     QImage image;
-    QSizeF m_size; // 图元的大小
+    QSizeF m_size;      // 图元的大小
+    qreal m_maskOpacity; // 遮罩透明度 (0.0 - 1.0)
 };
 
 #endif // MYGRAPHICBACKGROUNDITEM_H

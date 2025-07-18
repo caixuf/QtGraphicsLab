@@ -27,6 +27,7 @@ myGraphicRectItem::myGraphicRectItem(QSizeF size, QString imagePath):
     m_StateFlag(DEFAULT_FLAG),
     m_isMagnifierMode(false),  // 按照头文件中的声明顺序
     m_zoomFactor(1.0),         // 按照头文件中的声明顺序
+    m_magnifierQuality(QUALITY_FAST), // 默认快速模式
     m_hasDragged(false),       // 初始化拖拽状态
     m_cacheValid(false)        // 最后初始化缓存状态
 {
@@ -203,12 +204,75 @@ void myGraphicRectItem::drawHighDetail(QPainter *painter, const QRectF &target)
         QPixmap sourcePixmap = m_backgroundImage.copy(m_selectionRect.toRect());
         
         if (!sourcePixmap.isNull()) {
-            // 应用平滑变换
+            // 最高质量渲染设置
             painter->setRenderHint(QPainter::SmoothPixmapTransform, true);
+            painter->setRenderHint(QPainter::Antialiasing, true);
+            painter->setRenderHint(QPainter::TextAntialiasing, true);
             
-            // 绘制放大的内容 - 使用完整的源矩形
-            QRectF sourceRect(0, 0, sourcePixmap.width(), sourcePixmap.height());
-            painter->drawPixmap(target, sourcePixmap, sourceRect);
+            // 计算放大倍数
+            qreal scaleFactorX = target.width() / sourcePixmap.width();
+            qreal scaleFactorY = target.height() / sourcePixmap.height();
+            qreal maxScaleFactor = qMax(scaleFactorX, scaleFactorY);
+            
+            QPixmap finalPixmap;
+            
+            // 根据质量级别和放大倍数选择算法
+            switch (m_magnifierQuality) {
+            case QUALITY_FAST:
+                // 快速模式：使用Qt内置的平滑缩放
+                finalPixmap = sourcePixmap.scaled(
+                    target.size().toSize(),
+                    Qt::IgnoreAspectRatio,
+                    Qt::SmoothTransformation
+                );
+                break;
+                
+            case QUALITY_BALANCED:
+                // 平衡模式：中等放大倍数使用多步骤缩放
+                if (maxScaleFactor > MAGNIFIER_INTERPOLATION_THRESHOLD) {
+                    finalPixmap = createHighQualityScaledPixmap(sourcePixmap, target.size().toSize());
+                } else {
+                    finalPixmap = sourcePixmap.scaled(
+                        target.size().toSize(),
+                        Qt::IgnoreAspectRatio,
+                        Qt::SmoothTransformation
+                    );
+                }
+                break;
+                
+            case QUALITY_HIGH:
+                // 高质量模式：使用超分辨率算法
+                if (maxScaleFactor > SUPER_RESOLUTION_THRESHOLD) {
+                    finalPixmap = applySuperResolution(sourcePixmap, target.size().toSize());
+                } else if (maxScaleFactor > MAGNIFIER_INTERPOLATION_THRESHOLD) {
+                    finalPixmap = createSuperSampledPixmap(sourcePixmap, target.size().toSize());
+                } else {
+                    finalPixmap = createHighQualityScaledPixmap(sourcePixmap, target.size().toSize());
+                }
+                break;
+                
+            case QUALITY_ULTRA:
+                // 超高质量模式：使用最高质量算法
+                if (maxScaleFactor > SUPER_RESOLUTION_THRESHOLD) {
+                    finalPixmap = ultraHighQualityUpscale(sourcePixmap, target.size().toSize());
+                } else if (maxScaleFactor > MAGNIFIER_STEPS_THRESHOLD) {
+                    finalPixmap = applySuperResolution(sourcePixmap, target.size().toSize());
+                } else if (maxScaleFactor > MAGNIFIER_INTERPOLATION_THRESHOLD) {
+                    finalPixmap = createSuperSampledPixmap(sourcePixmap, target.size().toSize());
+                } else {
+                    finalPixmap = createHighQualityScaledPixmap(sourcePixmap, target.size().toSize());
+                }
+                break;
+            }
+            
+            // 只在高质量模式下应用边缘增强
+            if (m_magnifierQuality >= QUALITY_HIGH && maxScaleFactor > MAGNIFIER_INTERPOLATION_THRESHOLD) {
+                finalPixmap = applyEdgeEnhancement(finalPixmap);
+            }
+            
+            // 绘制最终图像
+            QRectF sourceRect(0, 0, finalPixmap.width(), finalPixmap.height());
+            painter->drawPixmap(target, finalPixmap, sourceRect);
             
             // 绘制放大镜边框（更亮的边框表示这是放大镜）
             QPen magnifierPen(Qt::white, 3);
@@ -801,4 +865,648 @@ void myGraphicRectItem::setZoomFactor(qreal factor)
             update(); // 重新绘制放大镜内容
         }
     }
+}
+
+void myGraphicRectItem::setMagnifierQuality(MagnifierQuality quality)
+{
+    if (m_magnifierQuality != quality) {
+        m_magnifierQuality = quality;
+        if (m_isMagnifierMode) {
+            update(); // 重新绘制放大镜内容
+        }
+    }
+}
+
+// 高质量图像缩放实现
+QPixmap myGraphicRectItem::createHighQualityScaledPixmap(const QPixmap& source, const QSize& targetSize) const
+{
+    if (source.isNull() || targetSize.isEmpty()) {
+        return QPixmap();
+    }
+    
+    // 如果目标尺寸与源尺寸相同，直接返回
+    if (source.size() == targetSize) {
+        return source;
+    }
+    
+    // 计算缩放比例
+    qreal scaleX = (qreal)targetSize.width() / source.width();
+    qreal scaleY = (qreal)targetSize.height() / source.height();
+    qreal maxScale = qMax(scaleX, scaleY);
+    
+    // 对于大幅度放大，使用多步骤缩放
+    if (maxScale > MAGNIFIER_QUALITY_MULTIPLIER) {
+        // 计算中间尺寸
+        qreal intermediateScale = qSqrt(maxScale);
+        QSize intermediateSize(
+            qRound(source.width() * intermediateScale),
+            qRound(source.height() * intermediateScale)
+        );
+        
+        // 限制中间尺寸在合理范围内
+        intermediateSize = intermediateSize.boundedTo(QSize(MAGNIFIER_MAX_SIZE, MAGNIFIER_MAX_SIZE));
+        
+        // 第一步：缩放到中间尺寸
+        QPixmap intermediatePixmap = source.scaled(
+            intermediateSize,
+            Qt::KeepAspectRatio,
+            Qt::SmoothTransformation
+        );
+        
+        // 第二步：从中间尺寸缩放到目标尺寸
+        return intermediatePixmap.scaled(
+            targetSize,
+            Qt::IgnoreAspectRatio,
+            Qt::SmoothTransformation
+        );
+    } else {
+        // 对于小幅度放大或缩小，直接缩放
+        return source.scaled(
+            targetSize,
+            Qt::IgnoreAspectRatio,
+            Qt::SmoothTransformation
+        );
+    }
+}
+
+// 超采样缩放实现
+QPixmap myGraphicRectItem::createSuperSampledPixmap(const QPixmap& source, const QSize& targetSize) const
+{
+    if (source.isNull() || targetSize.isEmpty()) {
+        return QPixmap();
+    }
+    
+    // 计算超采样尺寸
+    QSize superSampledSize(
+        qRound(targetSize.width() * MAGNIFIER_SUPERSAMPLING_FACTOR),
+        qRound(targetSize.height() * MAGNIFIER_SUPERSAMPLING_FACTOR)
+    );
+    
+    // 限制超采样尺寸
+    superSampledSize = superSampledSize.boundedTo(QSize(MAGNIFIER_MAX_SIZE, MAGNIFIER_MAX_SIZE));
+    
+    // 首先缩放到超采样尺寸
+    QPixmap superSampledPixmap = createHighQualityScaledPixmap(source, superSampledSize);
+    
+    // 然后缩放到目标尺寸（这样可以获得更好的抗锯齿效果）
+    return superSampledPixmap.scaled(
+        targetSize,
+        Qt::IgnoreAspectRatio,
+        Qt::SmoothTransformation
+    );
+}
+
+// 边缘增强实现
+QPixmap myGraphicRectItem::applyEdgeEnhancement(const QPixmap& source) const
+{
+    if (source.isNull()) {
+        return QPixmap();
+    }
+    
+    // 将QPixmap转换为QImage以进行像素级处理
+    QImage image = source.toImage();
+    if (image.isNull()) {
+        return source;
+    }
+    
+    // 确保图像格式支持像素访问
+    if (image.format() != QImage::Format_ARGB32 && image.format() != QImage::Format_RGB32) {
+        image = image.convertToFormat(QImage::Format_ARGB32);
+    }
+    
+    // 创建增强后的图像
+    QImage enhancedImage = image.copy();
+    
+    // 应用简单的锐化滤波器（3x3 Laplacian）
+    const int width = image.width();
+    const int height = image.height();
+    
+    // 锐化核心
+    const qreal kernel[3][3] = {
+        { 0, -MAGNIFIER_EDGE_ENHANCE_STRENGTH, 0 },
+        { -MAGNIFIER_EDGE_ENHANCE_STRENGTH, 1 + 4 * MAGNIFIER_EDGE_ENHANCE_STRENGTH, -MAGNIFIER_EDGE_ENHANCE_STRENGTH },
+        { 0, -MAGNIFIER_EDGE_ENHANCE_STRENGTH, 0 }
+    };
+    
+    // 应用滤波器（跳过边界像素）
+    for (int y = 1; y < height - 1; ++y) {
+        for (int x = 1; x < width - 1; ++x) {
+            qreal r = 0, g = 0, b = 0;
+            
+            // 应用3x3滤波器
+            for (int ky = -1; ky <= 1; ++ky) {
+                for (int kx = -1; kx <= 1; ++kx) {
+                    QRgb pixel = image.pixel(x + kx, y + ky);
+                    qreal weight = kernel[ky + 1][kx + 1];
+                    r += qRed(pixel) * weight;
+                    g += qGreen(pixel) * weight;
+                    b += qBlue(pixel) * weight;
+                }
+            }
+            
+            // 限制值范围并设置像素
+            int newR = qBound(0, qRound(r), 255);
+            int newG = qBound(0, qRound(g), 255);
+            int newB = qBound(0, qRound(b), 255);
+            
+            enhancedImage.setPixel(x, y, qRgb(newR, newG, newB));
+        }
+    }
+    
+    return QPixmap::fromImage(enhancedImage);
+}
+
+// 超分辨率算法实现
+QPixmap myGraphicRectItem::applySuperResolution(const QPixmap& source, const QSize& targetSize) const
+{
+    if (source.isNull() || targetSize.isEmpty()) {
+        return QPixmap();
+    }
+    
+    QImage sourceImage = source.toImage();
+    if (sourceImage.isNull()) {
+        return source;
+    }
+    
+    // 确保图像格式支持像素访问
+    if (sourceImage.format() != QImage::Format_ARGB32 && sourceImage.format() != QImage::Format_RGB32) {
+        sourceImage = sourceImage.convertToFormat(QImage::Format_ARGB32);
+    }
+    
+    // 使用边缘保持的超分辨率算法
+    QPixmap result = edgePreservingUpscale(sourceImage, targetSize);
+    
+    // 应用轻微的噪声抑制
+    if (!result.isNull()) {
+        QImage resultImage = result.toImage();
+        // 简单的高斯模糊用于噪声抑制
+        // 这里可以根据需要实现更复杂的噪声抑制算法
+        result = QPixmap::fromImage(resultImage);
+    }
+    
+    return result;
+}
+
+// 双三次插值实现
+QPixmap myGraphicRectItem::bicubicInterpolation(const QImage& source, const QSize& targetSize) const
+{
+    if (source.isNull() || targetSize.isEmpty()) {
+        return QPixmap();
+    }
+    
+    const int srcWidth = source.width();
+    const int srcHeight = source.height();
+    const int dstWidth = targetSize.width();
+    const int dstHeight = targetSize.height();
+    
+    QImage result(dstWidth, dstHeight, QImage::Format_ARGB32);
+    
+    const qreal scaleX = (qreal)srcWidth / dstWidth;
+    const qreal scaleY = (qreal)srcHeight / dstHeight;
+    
+    for (int y = 0; y < dstHeight; ++y) {
+        for (int x = 0; x < dstWidth; ++x) {
+            const qreal srcX = x * scaleX;
+            const qreal srcY = y * scaleY;
+            
+            const int x1 = qFloor(srcX);
+            const int y1 = qFloor(srcY);
+            const qreal dx = srcX - x1;
+            const qreal dy = srcY - y1;
+            
+            qreal r = 0, g = 0, b = 0, a = 0;
+            
+            // 双三次插值：使用4x4像素窗口
+            for (int j = -1; j <= 2; ++j) {
+                for (int i = -1; i <= 2; ++i) {
+                    const int px = qBound(0, x1 + i, srcWidth - 1);
+                    const int py = qBound(0, y1 + j, srcHeight - 1);
+                    
+                    const QRgb pixel = source.pixel(px, py);
+                    const qreal weightX = bicubicWeight(dx - i);
+                    const qreal weightY = bicubicWeight(dy - j);
+                    const qreal weight = weightX * weightY;
+                    
+                    r += qRed(pixel) * weight;
+                    g += qGreen(pixel) * weight;
+                    b += qBlue(pixel) * weight;
+                    a += qAlpha(pixel) * weight;
+                }
+            }
+            
+            result.setPixel(x, y, qRgba(
+                qBound(0, qRound(r), 255),
+                qBound(0, qRound(g), 255),
+                qBound(0, qRound(b), 255),
+                qBound(0, qRound(a), 255)
+            ));
+        }
+    }
+    
+    return QPixmap::fromImage(result);
+}
+
+// 边缘保持的超分辨率放大
+QPixmap myGraphicRectItem::edgePreservingUpscale(const QImage& source, const QSize& targetSize) const
+{
+    if (source.isNull() || targetSize.isEmpty()) {
+        return QPixmap();
+    }
+    
+    const int srcWidth = source.width();
+    const int srcHeight = source.height();
+    const int dstWidth = targetSize.width();
+    const int dstHeight = targetSize.height();
+    
+    QImage result(dstWidth, dstHeight, QImage::Format_ARGB32);
+    
+    const qreal scaleX = (qreal)srcWidth / dstWidth;
+    const qreal scaleY = (qreal)srcHeight / dstHeight;
+    
+    for (int y = 0; y < dstHeight; ++y) {
+        for (int x = 0; x < dstWidth; ++x) {
+            const qreal srcX = x * scaleX;
+            const qreal srcY = y * scaleY;
+            
+            const int x1 = qFloor(srcX);
+            const int y1 = qFloor(srcY);
+            const qreal dx = srcX - x1;
+            const qreal dy = srcY - y1;
+            
+            // 检测边缘强度
+            const qreal edgeStrength = detectEdgeStrength(source, 
+                qBound(0, x1, srcWidth - 1), 
+                qBound(0, y1, srcHeight - 1));
+            
+            qreal r = 0, g = 0, b = 0, a = 0;
+            
+            if (edgeStrength > EDGE_THRESHOLD) {
+                // 在边缘区域使用更锐利的插值
+                // 使用双三次插值但调整参数以保持边缘
+                for (int j = -1; j <= 2; ++j) {
+                    for (int i = -1; i <= 2; ++i) {
+                        const int px = qBound(0, x1 + i, srcWidth - 1);
+                        const int py = qBound(0, y1 + j, srcHeight - 1);
+                        
+                        const QRgb pixel = source.pixel(px, py);
+                        const qreal weightX = bicubicWeight(dx - i, -0.75); // 更锐利的参数
+                        const qreal weightY = bicubicWeight(dy - j, -0.75);
+                        const qreal weight = weightX * weightY;
+                        
+                        r += qRed(pixel) * weight;
+                        g += qGreen(pixel) * weight;
+                        b += qBlue(pixel) * weight;
+                        a += qAlpha(pixel) * weight;
+                    }
+                }
+            } else {
+                // 在平滑区域使用标准双三次插值
+                for (int j = -1; j <= 2; ++j) {
+                    for (int i = -1; i <= 2; ++i) {
+                        const int px = qBound(0, x1 + i, srcWidth - 1);
+                        const int py = qBound(0, y1 + j, srcHeight - 1);
+                        
+                        const QRgb pixel = source.pixel(px, py);
+                        const qreal weightX = bicubicWeight(dx - i);
+                        const qreal weightY = bicubicWeight(dy - j);
+                        const qreal weight = weightX * weightY;
+                        
+                        r += qRed(pixel) * weight;
+                        g += qGreen(pixel) * weight;
+                        b += qBlue(pixel) * weight;
+                        a += qAlpha(pixel) * weight;
+                    }
+                }
+            }
+            
+            result.setPixel(x, y, qRgba(
+                qBound(0, qRound(r), 255),
+                qBound(0, qRound(g), 255),
+                qBound(0, qRound(b), 255),
+                qBound(0, qRound(a), 255)
+            ));
+        }
+    }
+    
+    return QPixmap::fromImage(result);
+}
+
+// 双三次插值权重函数
+qreal myGraphicRectItem::bicubicWeight(qreal x, qreal a) const
+{
+    x = qAbs(x);
+    if (x <= 1.0) {
+        return (a + 2.0) * x * x * x - (a + 3.0) * x * x + 1.0;
+    } else if (x < 2.0) {
+        return a * x * x * x - 5.0 * a * x * x + 8.0 * a * x - 4.0 * a;
+    } else {
+        return 0.0;
+    }
+}
+
+// 边缘强度检测
+qreal myGraphicRectItem::detectEdgeStrength(const QImage& image, int x, int y) const
+{
+    const int width = image.width();
+    const int height = image.height();
+    
+    if (x <= 0 || x >= width - 1 || y <= 0 || y >= height - 1) {
+        return 0.0;
+    }
+    
+    // 使用Sobel算子检测边缘
+    const QRgb center = image.pixel(x, y);
+    // 移除未使用的变量
+    
+    // Sobel X方向
+    int sobelX = 0;
+    sobelX += (qRed(image.pixel(x-1, y-1)) + qGreen(image.pixel(x-1, y-1)) + qBlue(image.pixel(x-1, y-1))) / 3 * (-1);
+    sobelX += (qRed(image.pixel(x+1, y-1)) + qGreen(image.pixel(x+1, y-1)) + qBlue(image.pixel(x+1, y-1))) / 3 * 1;
+    sobelX += (qRed(image.pixel(x-1, y)) + qGreen(image.pixel(x-1, y)) + qBlue(image.pixel(x-1, y))) / 3 * (-2);
+    sobelX += (qRed(image.pixel(x+1, y)) + qGreen(image.pixel(x+1, y)) + qBlue(image.pixel(x+1, y))) / 3 * 2;
+    sobelX += (qRed(image.pixel(x-1, y+1)) + qGreen(image.pixel(x-1, y+1)) + qBlue(image.pixel(x-1, y+1))) / 3 * (-1);
+    sobelX += (qRed(image.pixel(x+1, y+1)) + qGreen(image.pixel(x+1, y+1)) + qBlue(image.pixel(x+1, y+1))) / 3 * 1;
+    
+    // Sobel Y方向
+    int sobelY = 0;
+    sobelY += (qRed(image.pixel(x-1, y-1)) + qGreen(image.pixel(x-1, y-1)) + qBlue(image.pixel(x-1, y-1))) / 3 * (-1);
+    sobelY += (qRed(image.pixel(x, y-1)) + qGreen(image.pixel(x, y-1)) + qBlue(image.pixel(x, y-1))) / 3 * (-2);
+    sobelY += (qRed(image.pixel(x+1, y-1)) + qGreen(image.pixel(x+1, y-1)) + qBlue(image.pixel(x+1, y-1))) / 3 * (-1);
+    sobelY += (qRed(image.pixel(x-1, y+1)) + qGreen(image.pixel(x-1, y+1)) + qBlue(image.pixel(x-1, y+1))) / 3 * 1;
+    sobelY += (qRed(image.pixel(x, y+1)) + qGreen(image.pixel(x, y+1)) + qBlue(image.pixel(x, y+1))) / 3 * 2;
+    sobelY += (qRed(image.pixel(x+1, y+1)) + qGreen(image.pixel(x+1, y+1)) + qBlue(image.pixel(x+1, y+1))) / 3 * 1;
+    
+    // 计算梯度幅度
+    return qSqrt(sobelX * sobelX + sobelY * sobelY);
+}
+
+// 超级优化：终极超分辨率算法
+QPixmap myGraphicRectItem::ultraHighQualityUpscale(const QPixmap& source, const QSize& targetSize) const
+{
+    if (source.isNull() || targetSize.isEmpty()) {
+        return QPixmap();
+    }
+    
+    QImage sourceImage = source.toImage();
+    if (sourceImage.format() != QImage::Format_ARGB32) {
+        sourceImage = sourceImage.convertToFormat(QImage::Format_ARGB32);
+    }
+    
+    // 第一步：使用多级细节增强
+    QPixmap detailEnhanced = multiLevelDetail(sourceImage, targetSize);
+    
+    // 第二步：Lanczos重采样（最高质量插值）
+    QImage detailImage = detailEnhanced.toImage();
+    QPixmap lanczosResult = lanczosResample(detailImage, targetSize);
+    
+    // 第三步：自适应边缘增强
+    QImage lanczosImage = lanczosResult.toImage();
+    QPixmap edgeEnhanced = adaptiveEdgeEnhancement(lanczosImage);
+    
+    // 第四步：色彩空间增强
+    QImage edgeImage = edgeEnhanced.toImage();
+    QPixmap colorEnhanced = colorSpaceEnhancement(edgeImage);
+    
+    return colorEnhanced;
+}
+
+// Lanczos重采样算法（高质量插值）
+QPixmap myGraphicRectItem::lanczosResample(const QImage& source, const QSize& targetSize) const
+{
+    if (source.isNull() || targetSize.isEmpty()) {
+        return QPixmap();
+    }
+    
+    const int srcWidth = source.width();
+    const int srcHeight = source.height();
+    const int dstWidth = targetSize.width();
+    const int dstHeight = targetSize.height();
+    
+    QImage result(dstWidth, dstHeight, QImage::Format_ARGB32);
+    
+    const qreal scaleX = (qreal)srcWidth / dstWidth;
+    const qreal scaleY = (qreal)srcHeight / dstHeight;
+    const int kernelSize = ADAPTIVE_KERNEL_SIZE;
+    
+    for (int y = 0; y < dstHeight; ++y) {
+        for (int x = 0; x < dstWidth; ++x) {
+            const qreal srcX = x * scaleX;
+            const qreal srcY = y * scaleY;
+            
+            qreal r = 0, g = 0, b = 0, a = 0;
+            qreal weightSum = 0;
+            
+            // 使用更大的Lanczos核心
+            for (int j = -kernelSize; j <= kernelSize; ++j) {
+                for (int i = -kernelSize; i <= kernelSize; ++i) {
+                    const int px = qBound(0, qRound(srcX) + i, srcWidth - 1);
+                    const int py = qBound(0, qRound(srcY) + j, srcHeight - 1);
+                    
+                    const qreal dx = srcX - (qRound(srcX) + i);
+                    const qreal dy = srcY - (qRound(srcY) + j);
+                    
+                    const qreal weightX = lanczosWeight(dx, 3);
+                    const qreal weightY = lanczosWeight(dy, 3);
+                    const qreal weight = weightX * weightY;
+                    
+                    if (weight != 0) {
+                        const QRgb pixel = source.pixel(px, py);
+                        r += qRed(pixel) * weight;
+                        g += qGreen(pixel) * weight;
+                        b += qBlue(pixel) * weight;
+                        a += qAlpha(pixel) * weight;
+                        weightSum += weight;
+                    }
+                }
+            }
+            
+            if (weightSum > 0) {
+                r /= weightSum;
+                g /= weightSum;
+                b /= weightSum;
+                a /= weightSum;
+            }
+            
+            result.setPixel(x, y, qRgba(
+                qBound(0, qRound(r), 255),
+                qBound(0, qRound(g), 255),
+                qBound(0, qRound(b), 255),
+                qBound(0, qRound(a), 255)
+            ));
+        }
+    }
+    
+    return QPixmap::fromImage(result);
+}
+
+// 自适应边缘增强
+QPixmap myGraphicRectItem::adaptiveEdgeEnhancement(const QImage& source) const
+{
+    if (source.isNull()) {
+        return QPixmap();
+    }
+    
+    const int width = source.width();
+    const int height = source.height();
+    QImage result = source.copy();
+    
+    // 多级边缘检测和增强
+    for (int level = 0; level < MULTI_LEVEL_EDGE_SAMPLES; ++level) {
+        qreal levelFactor = 1.0 + level * 0.2;
+        
+        for (int y = 2; y < height - 2; ++y) {
+            for (int x = 2; x < width - 2; ++x) {
+                // 检测局部对比度
+                qreal contrast = calculateLocalContrast(source, x, y, 2);
+                
+                if (contrast > EDGE_THRESHOLD * levelFactor) {
+                    // 在边缘区域应用自适应锐化
+                    QRgb center = source.pixel(x, y);
+                    
+                    // 计算拉普拉斯算子
+                    qreal laplacian = 0;
+                    laplacian += (qRed(source.pixel(x-1, y)) + qGreen(source.pixel(x-1, y)) + qBlue(source.pixel(x-1, y))) / 3.0 * (-1);
+                    laplacian += (qRed(source.pixel(x+1, y)) + qGreen(source.pixel(x+1, y)) + qBlue(source.pixel(x+1, y))) / 3.0 * (-1);
+                    laplacian += (qRed(source.pixel(x, y-1)) + qGreen(source.pixel(x, y-1)) + qBlue(source.pixel(x, y-1))) / 3.0 * (-1);
+                    laplacian += (qRed(source.pixel(x, y+1)) + qGreen(source.pixel(x, y+1)) + qBlue(source.pixel(x, y+1))) / 3.0 * (-1);
+                    laplacian += (qRed(center) + qGreen(center) + qBlue(center)) / 3.0 * 4;
+                    
+                    // 自适应增强强度
+                    qreal enhanceFactor = DETAIL_ENHANCEMENT_FACTOR * (contrast / 100.0);
+                    
+                    int newR = qBound(0, qRound(qRed(center) + laplacian * enhanceFactor * 0.01), 255);
+                    int newG = qBound(0, qRound(qGreen(center) + laplacian * enhanceFactor * 0.01), 255);
+                    int newB = qBound(0, qRound(qBlue(center) + laplacian * enhanceFactor * 0.01), 255);
+                    
+                    result.setPixel(x, y, qRgba(newR, newG, newB, qAlpha(center)));
+                }
+            }
+        }
+    }
+    
+    return QPixmap::fromImage(result);
+}
+
+// 色彩空间增强
+QPixmap myGraphicRectItem::colorSpaceEnhancement(const QImage& source) const
+{
+    if (source.isNull()) {
+        return QPixmap();
+    }
+    
+    const int width = source.width();
+    const int height = source.height();
+    QImage result(width, height, QImage::Format_ARGB32);
+    
+    for (int y = 0; y < height; ++y) {
+        for (int x = 0; x < width; ++x) {
+            QRgb pixel = source.pixel(x, y);
+            int r = qRed(pixel);
+            int g = qGreen(pixel);
+            int b = qBlue(pixel);
+            int a = qAlpha(pixel);
+            
+            // 转换到YUV色彩空间进行增强
+            qreal Y, U, V;
+            rgbToYuv(r, g, b, Y, U, V);
+            
+            // 增强亮度对比度
+            Y = Y * CONTRAST_ENHANCEMENT_FACTOR;
+            Y = qBound(0.0, Y, 255.0);
+            
+            // 轻微增强色度饱和度
+            U = U * 1.1;
+            V = V * 1.1;
+            U = qBound(-128.0, U, 127.0);
+            V = qBound(-128.0, V, 127.0);
+            
+            // 转换回RGB
+            int newR, newG, newB;
+            yuvToRgb(Y, U, V, newR, newG, newB);
+            
+            result.setPixel(x, y, qRgba(newR, newG, newB, a));
+        }
+    }
+    
+    return QPixmap::fromImage(result);
+}
+
+// 多级细节增强
+QPixmap myGraphicRectItem::multiLevelDetail(const QImage& source, const QSize& targetSize) const
+{
+    if (source.isNull() || targetSize.isEmpty()) {
+        return QPixmap();
+    }
+    
+    // 使用超高采样率进行中间处理
+    QSize ultraSize(
+        qRound(targetSize.width() * ULTRA_SAMPLING_FACTOR),
+        qRound(targetSize.height() * ULTRA_SAMPLING_FACTOR)
+    );
+    
+    // 限制尺寸以防止内存溢出
+    ultraSize = ultraSize.boundedTo(QSize(MAGNIFIER_MAX_SIZE, MAGNIFIER_MAX_SIZE));
+    
+    // 使用边缘保持算法放大到超高分辨率
+    QPixmap ultraRes = edgePreservingUpscale(source, ultraSize);
+    
+    // 应用多级细节增强
+    QImage ultraImage = ultraRes.toImage();
+    QPixmap enhanced = adaptiveEdgeEnhancement(ultraImage);
+    
+    // 最后缩放到目标尺寸（使用最高质量）
+    return enhanced.scaled(targetSize, Qt::IgnoreAspectRatio, Qt::SmoothTransformation);
+}
+
+// Lanczos权重函数
+qreal myGraphicRectItem::lanczosWeight(qreal x, int a) const
+{
+    if (x == 0) return 1.0;
+    if (qAbs(x) >= a) return 0.0;
+    
+    const qreal pi = 3.14159265359;
+    const qreal pix = pi * x;
+    const qreal pixOverA = pix / a;
+    
+    return (qSin(pix) / pix) * (qSin(pixOverA) / pixOverA);
+}
+
+// 计算局部对比度
+qreal myGraphicRectItem::calculateLocalContrast(const QImage& image, int x, int y, int radius) const
+{
+    const int width = image.width();
+    const int height = image.height();
+    
+    if (x < radius || x >= width - radius || y < radius || y >= height - radius) {
+        return 0.0;
+    }
+    
+    qreal min = 255.0, max = 0.0;
+    
+    for (int dy = -radius; dy <= radius; ++dy) {
+        for (int dx = -radius; dx <= radius; ++dx) {
+            QRgb pixel = image.pixel(x + dx, y + dy);
+            qreal gray = (qRed(pixel) + qGreen(pixel) + qBlue(pixel)) / 3.0;
+            min = qMin(min, gray);
+            max = qMax(max, gray);
+        }
+    }
+    
+    return max - min;
+}
+
+// RGB到YUV转换
+void myGraphicRectItem::rgbToYuv(int r, int g, int b, qreal& y, qreal& u, qreal& v) const
+{
+    y = LUMINANCE_WEIGHT * r + CHROMINANCE_U_WEIGHT * g + CHROMINANCE_V_WEIGHT * b;
+    u = -0.14713 * r - 0.28886 * g + 0.436 * b;
+    v = 0.615 * r - 0.51499 * g - 0.10001 * b;
+}
+
+// YUV到RGB转换
+void myGraphicRectItem::yuvToRgb(qreal y, qreal u, qreal v, int& r, int& g, int& b) const
+{
+    r = qBound(0, qRound(y + 1.13983 * v), 255);
+    g = qBound(0, qRound(y - 0.39465 * u - 0.58060 * v), 255);
+    b = qBound(0, qRound(y + 2.03211 * u), 255);
 }

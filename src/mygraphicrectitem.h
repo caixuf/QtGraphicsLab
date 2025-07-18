@@ -96,8 +96,33 @@ public:
     void setBackgroundImage(const QPixmap& bgImage);
     void setSelectionRect(const QRectF& selectionRect);
     void setZoomFactor(qreal factor);
+    void setMagnifierQuality(MagnifierQuality quality);
     bool isMagnifierMode() const { return m_isMagnifierMode; }
     bool getMark() const { return mark; }  // 获取mark状态
+    MagnifierQuality getMagnifierQuality() const { return m_magnifierQuality; }
+
+    // 高质量图像缩放辅助方法
+    QPixmap createHighQualityScaledPixmap(const QPixmap& source, const QSize& targetSize) const;
+    QPixmap createSuperSampledPixmap(const QPixmap& source, const QSize& targetSize) const;
+    QPixmap applyEdgeEnhancement(const QPixmap& source) const;
+    
+    // 超分辨率算法方法
+    QPixmap applySuperResolution(const QPixmap& source, const QSize& targetSize) const;
+    QPixmap bicubicInterpolation(const QImage& source, const QSize& targetSize) const;
+    QPixmap edgePreservingUpscale(const QImage& source, const QSize& targetSize) const;
+    qreal bicubicWeight(qreal x, qreal a = BICUBIC_SHARPNESS) const;
+    qreal detectEdgeStrength(const QImage& image, int x, int y) const;
+    
+    // 超级优化方法
+    QPixmap ultraHighQualityUpscale(const QPixmap& source, const QSize& targetSize) const;
+    QPixmap lanczosResample(const QImage& source, const QSize& targetSize) const;
+    QPixmap adaptiveEdgeEnhancement(const QImage& source) const;
+    QPixmap colorSpaceEnhancement(const QImage& source) const;
+    QPixmap multiLevelDetail(const QImage& source, const QSize& targetSize) const;
+    qreal lanczosWeight(qreal x, int a = 3) const;
+    qreal calculateLocalContrast(const QImage& image, int x, int y, int radius = 2) const;
+    void rgbToYuv(int r, int g, int b, qreal& y, qreal& u, qreal& v) const;
+    void yuvToRgb(qreal y, qreal u, qreal v, int& r, int& g, int& b) const;
 
     // 标记是否正在旋转
     bool m_bRotate;
@@ -185,6 +210,7 @@ private:
     QPixmap m_backgroundImage;     // 背景图像
     QRectF m_selectionRect;        // 选择区域（在背景图像中的位置）
     qreal m_zoomFactor;            // 放大倍数
+    MagnifierQuality m_magnifierQuality; // 放大镜质量级别
 
     // 鼠标交互状态跟踪
     bool m_hasDragged;             // 是否发生了拖拽
